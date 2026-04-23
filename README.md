@@ -37,6 +37,22 @@ Designed as a self‑hosted AI backend with a web interface and full API control
 
 ## Installation
 
+
+You can use this simple script to install it on Linux or macOS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/QKing-Official/EndAI/main/setup.sh | bash
+```
+
+For Windows:
+
+```bash
+irm https://raw.githubusercontent.com/QKing-Official/EndAI/main/setup.ps1 | iex
+```
+
+Alternatively, you can follow the manual steps below.
+
+
 ### 1. Clone the repository
 
 ```bash
