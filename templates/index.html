@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EndAI Chat</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0f0f0f;
+  --panel:    #161616;
+  --panel2:   #1c1c1c;
+  --border:   #2a2a2a;
+  --border2:  #333;
+  --text:     #e2e2e2;
+  --muted:    #666;
+  --muted2:   #888;
+  --accent:   #3ddc84;
+  --accent-d: #2ab369;
+  --red:      #e05c5c;
+  --yellow:   #e0a84c;
+  --blue:     #5c9ee0;
+  --mono:     'JetBrains Mono', monospace;
+  --sans:     'Inter', system-ui, sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.5 var(--sans);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.layout { display: flex; flex: 1; overflow: hidden; }
+
+/* The header! */
+header {
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  padding: 0 14px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  font-family: var(--mono);
+}
+header h1 { font-size: 13px; font-weight: 600; color: var(--accent); letter-spacing: .04em; }
+.header-sep { width: 1px; height: 16px; background: var(--border2); }
+#hw-badge { font-size: 11px; color: var(--muted2); }
+#hw-badge.gpu { color: var(--accent); }
+#model-status-header {
+  font-size: 11px;
+  display: flex; align-items: center; gap: 5px;
+  margin-left: auto;
+  color: var(--muted);
+}
+.status-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--border2); flex-shrink: 0;
+  transition: background .3s;
+}
+.status-dot.ready   { background: var(--accent); }
+.status-dot.loading { background: var(--yellow); animation: pulse 1.2s ease-in-out infinite; }
+.status-dot.error   { background: var(--red); }
+
+/* The sidebar */
+.sidebar {
+  width: 250px;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.sidebar-scroll { flex: 1; overflow-y: auto; }
+.sidebar-scroll::-webkit-scrollbar { width: 3px; }
+.sidebar-scroll::-webkit-scrollbar-thumb { background: var(--border2); }
+
+.section { border-bottom: 1px solid var(--border); padding: 10px 12px; }
+.section-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--mono);
+}
+.section-title button {
+  font-size: 10px; color: var(--muted); background: none; border: none;
+  cursor: pointer; font-family: var(--mono);
+}
+.section-title button:hover { color: var(--text); }
+
+/* Sessionsssss */
+.session-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 7px; border-radius: 4px;
+  cursor: pointer; border: 1px solid transparent;
+  transition: background .15s;
+}
+.session-item:hover { background: var(--panel2); }
+.session-item.active { background: #1a2e22; border-color: #2a4435; }
+.session-label { flex: 1; min-width: 0; }
+.session-name {
+  font-size: 12px; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; font-family: var(--sans);
+}
+.session-meta { font-size: 10px; color: var(--muted); font-family: var(--mono); }
+.session-acts { display: flex; gap: 2px; opacity: 0; }
+.session-item:hover .session-acts { opacity: 1; }
+
+/* Modelssss */
+.model-item {
+  display: flex; align-items: center; gap: 7px;
+  padding: 5px 7px; border-radius: 4px; cursor: pointer;
+  transition: background .15s;
+}
+.model-item:hover { background: var(--panel2); }
+.model-item.active { background: #1a2e22; }
+.model-item.errored { background: #2a1515; }
+.model-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--border2); flex-shrink: 0; transition: background .2s;
+}
+.model-item.active  .model-dot { background: var(--accent); }
+.model-item.loading .model-dot { background: var(--yellow); animation: pulse 1s infinite; }
+.model-item.errored .model-dot { background: var(--red); }
+.model-label { flex: 1; min-width: 0; }
+.model-name { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: var(--mono); }
+.model-size { font-size: 10px; color: var(--muted); }
+.model-acts { display: flex; gap: 2px; opacity: 0; }
+.model-item:hover .model-acts { opacity: 1; }
+
+.mini-btn { background: none; border: none; cursor: pointer; font-size: 10px; padding: 2px 5px; border-radius: 3px; font-family: var(--mono); }
+.mini-btn.load   { color: var(--accent); } .mini-btn.load:hover   { background: #1a2e22; }
+.mini-btn.unload { color: var(--yellow); } .mini-btn.unload:hover { background: #2e2410; }
+.mini-btn.del    { color: var(--red);    } .mini-btn.del:hover    { background: #2a1515; }
+.mini-btn.rename { color: var(--muted2); } .mini-btn.rename:hover { background: var(--panel2); }
+
+.error-badge { font-size: 10px; color: var(--red); font-family: var(--mono); padding: 3px 7px; }
+.empty { font-size: 11px; color: var(--muted); padding: 2px 0; font-family: var(--mono); }
+
+/* Quick downloads so that the user can fucking click instead of searching the fucking whole internet for a stupid model! */
+.quick-btn {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; background: none; border: 1px solid var(--border);
+  border-radius: 4px; padding: 6px 8px; margin-bottom: 4px;
+  cursor: pointer; text-align: left; color: var(--text);
+  font: 13px var(--sans); transition: border-color .15s;
+}
+.quick-btn:hover { border-color: var(--accent); }
+.quick-btn:last-of-type { margin-bottom: 0; }
+.quick-name { font-size: 11px; font-weight: 600; }
+.quick-meta { font-size: 10px; color: var(--muted); font-family: var(--mono); }
+
+/* Presets for ease of use */
+.preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.preset-btn {
+  background: var(--panel2); border: 1px solid var(--border);
+  border-radius: 4px; padding: 6px 7px; cursor: pointer;
+  text-align: left; color: var(--text); transition: border-color .15s, background .15s;
+}
+.preset-btn:hover { border-color: var(--accent); }
+.preset-btn.active { border-color: var(--accent); background: #1a2e22; }
+.preset-btn-name { font-size: 11px; font-weight: 600; font-family: var(--sans); display: block; }
+.preset-btn-desc { font-size: 10px; color: var(--muted); font-family: var(--mono); display: block; margin-top: 1px; }
+
+/* Download progress */
+.dl-items { margin-top: 6px; display: flex; flex-direction: column; gap: 5px; }
+.dl-item { font-size: 11px; font-family: var(--mono); }
+.dl-row { display: flex; justify-content: space-between; margin-bottom: 3px; color: var(--muted2); }
+.dl-row span:first-child { color: var(--text); }
+.bar { height: 2px; background: var(--border); border-radius: 1px; }
+.bar-fill { height: 2px; background: var(--accent); border-radius: 1px; transition: width .3s; }
+.dl-ok { color: var(--accent); }
+.dl-err { color: var(--red); }
+
+/* Inputs */
+input, textarea, select {
+  background: var(--panel2); border: 1px solid var(--border);
+  color: var(--text); font: 12px var(--sans);
+  padding: 6px 8px; border-radius: 4px; outline: none; width: 100%;
+}
+input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+textarea { resize: vertical; }
+.url-row { display: flex; gap: 5px; }
+.url-row input { flex: 1; }
+
+.btn {
+  background: var(--accent); border: none; color: #0a0a0a;
+  font: 600 11px var(--mono); padding: 6px 12px; border-radius: 4px;
+  cursor: pointer; white-space: nowrap; letter-spacing: .03em;
+  transition: opacity .15s;
+}
+.btn:hover { opacity: .85; }
+.btn:disabled { opacity: .35; cursor: not-allowed; }
+.btn.ghost {
+  background: none; border: 1px solid var(--border);
+  color: var(--muted2); font: 500 11px var(--mono);
+}
+.btn.ghost:hover { border-color: var(--border2); color: var(--text); opacity: 1; }
+
+/* Settings */
+.setting { margin-bottom: 9px; }
+.setting:last-child { margin-bottom: 0; }
+.setting label {
+  font-size: 10px; color: var(--muted); display: flex;
+  justify-content: space-between; margin-bottom: 3px;
+  font-family: var(--mono);
+}
+.setting label span { color: var(--text); }
+input[type=range] { padding: 0; height: 3px; accent-color: var(--accent); cursor: pointer; }
+
+/* Area of the chat */
+.chat { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+.messages {
+  flex: 1; overflow-y: auto; padding: 20px 24px;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.messages::-webkit-scrollbar { width: 3px; }
+.messages::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.msg { padding: 10px 14px; border-radius: 5px; max-width: 860px; }
+.msg.user {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  align-self: flex-end;
+}
+.msg.assistant { align-self: flex-start; }
+.msg-role {
+  font-size: 10px; color: var(--muted); margin-bottom: 5px;
+  font-family: var(--mono); letter-spacing: .06em; text-transform: uppercase;
+}
+.msg-text { font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+.msg-text code {
+  background: var(--panel2); padding: 1px 5px; border-radius: 3px;
+  font-size: 12px; font-family: var(--mono); color: var(--accent);
+}
+.msg-text pre {
+  background: var(--panel); border: 1px solid var(--border);
+  padding: 10px 12px; border-radius: 4px; overflow-x: auto;
+  margin: 8px 0; font-family: var(--mono); font-size: 12px;
+}
+.msg-text pre code { background: none; padding: 0; color: var(--text); }
+
+.trimmed-notice {
+  font-size: 10px; color: var(--yellow); font-family: var(--mono);
+  text-align: center; padding: 4px;
+  opacity: .7;
+}
+
+.cursor::after { content: '▋'; animation: blink .7s step-end infinite; color: var(--accent); }
+
+.welcome {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 8px; opacity: .2; pointer-events: none;
+  font-family: var(--mono);
+}
+.welcome h2 { font-size: 22px; font-weight: 400; letter-spacing: -.02em; }
+.welcome p { font-size: 12px; color: var(--muted); }
+
+/* Input area */
+.input-area {
+  border-top: 1px solid var(--border); padding: 10px 16px;
+  display: flex; gap: 7px; align-items: flex-end;
+  background: var(--panel); flex-shrink: 0;
+}
+#chat-input {
+  min-height: 38px; max-height: 160px; resize: none; flex: 1;
+  font: 13px var(--sans);
+}
+#send-btn   { height: 38px; }
+#stop-btn   { height: 38px; background: none; border: 1px solid var(--red); color: var(--red); display: none; font: 600 11px var(--mono); padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+#stop-btn.show { display: block; }
+
+.input-footer {
+  display: flex; align-items: center; gap: 10px;
+  padding: 4px 16px 6px; background: var(--panel);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.token-counter {
+  font-size: 10px; color: var(--muted); font-family: var(--mono);
+  margin-left: auto;
+}
+.token-counter.warn { color: var(--yellow); }
+.token-counter.danger { color: var(--red); }
+
+/* Template selector in footer */
+.footer-label { font-size: 10px; color: var(--muted); font-family: var(--mono); white-space: nowrap; }
+.footer-select {
+  font-size: 10px; font-family: var(--mono); padding: 2px 6px;
+  width: auto; height: 24px;
+}
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 60px; right: 14px;
+  background: var(--panel); border: 1px solid var(--border);
+  color: var(--text); font-size: 11px; font-family: var(--mono);
+  padding: 6px 11px; border-radius: 4px;
+  opacity: 0; transition: opacity .2s;
+  pointer-events: none; z-index: 99;
+}
+.toast.show { opacity: 1; }
+.toast.ok  { border-color: var(--accent); color: var(--accent); }
+.toast.err { border-color: var(--red);    color: var(--red); }
+.toast.warn { border-color: var(--yellow); color: var(--yellow); }
+
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+</style>
+</head>
+<body>
+
+<!-- the header of the thing, like the top of the navbar left thingy-->
+<header>
+  <h1>EndAI Chat</h1>
+  <div class="header-sep"></div>
+  <div class="header-sep"></div>
+  <div id="model-status-header">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-text">no model</span>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-scroll">
+
+      <!-- Sessions that were previously made. We always have one session no matter what -->
+      <div class="section">
+        <div class="section-title">
+          Sessions
+          <button onclick="newSession()">+ new</button>
+        </div>
+        <div id="session-list"><div class="empty">no sessions</div></div>
+      </div>
+
+      <!-- Model that are currently installed -->
+      <div class="section">
+        <div class="section-title">
+          Models
+          <button onclick="refreshModels()">↺</button>
+        </div>
+        <div id="model-list"><div class="empty">no .gguf files</div></div>
+        <div id="load-error-display"></div>
+      </div>
+
+      <!-- Presets -->
+      <div class="section">
+        <div class="section-title">Presets</div>
+        <div class="preset-grid" id="preset-grid"></div>
+      </div>
+
+      <!-- Quick downloads foe easy downloading and we prevent that the user will complain about it! -->
+      <div class="section">
+        <div class="section-title">Quick Download</div>
+
+        <!-- ── Small / fits any GPU ── -->
+        <button class="quick-btn" onclick="quickDl('https://huggingface.co/bartowski/SmolLM2-1.7B-Instruct-GGUF/resolve/main/SmolLM2-1.7B-Instruct-Q4_K_M.gguf','SmolLM2-1.7B-Q4_K_M.gguf')">
+          <div><div class="quick-name">SmolLM2 1.7B</div><div class="quick-meta">HF · ~1.1 GB · chatml</div></div>
+          <span style="color:var(--accent)">↓</span>
+        </button>
+        <button class="quick-btn" onclick="quickDl('https://huggingface.co/bartowski/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf','Qwen2.5-1.5B-Q4_K_M.gguf')">
+          <div><div class="quick-name">Qwen 2.5 1.5B</div><div class="quick-meta">Alibaba · ~1.0 GB · chatml</div></div>
+          <span style="color:var(--accent)">↓</span>
+        </button>
+        <button class="quick-btn" onclick="quickDl('https://huggingface.co/bartowski/Qwen2.5-3B-Instruct-GGUF/resolve/main/Qwen2.5-3B-Instruct-Q4_K_M.gguf','Qwen2.5-3B-Q4_K_M.gguf')">
+          <div><div class="quick-name">Qwen 2.5 3B</div><div class="quick-meta">Alibaba · ~2.0 GB · chatml</div></div>
+          <span style="color:var(--accent)">↓</span>
+        </button>
+        <button class="quick-btn" onclick="quickDl('https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf','Llama-3.2-3B-Q4_K_M.gguf')">
+          <div><div class="quick-name">Llama 3.2 3B</div><div class="quick-meta">Meta · ~2.0 GB · llama3</div></div>
+          <span style="color:var(--accent)">↓</span>
+        </button>
+        <button class="quick-btn" onclick="quickDl('https://huggingface.co/bartowski/Phi-3.5-mini-instruct-GGUF/resolve/main/Phi-3.5-mini-instruct-Q4_K_M.gguf','Phi-3.5-mini-Q4_K_M.gguf')">
+          <div><div class="quick-name">Phi 3.5 Mini</div><div class="quick-meta">Microsoft · ~2.2 GB · chatml</div></div>
+          <span style="color:var(--accent)">↓</span>
+        </button>
+
+        <!-- ── Mid-size / good for 8–12 GB VRAM ── -->
+        <button class="quick-btn" onclick="quickDl('https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf','Qwen2.5-7B-Q4_K_M.gguf')">
+          <div><div class="quick-name">Qwen 2.5 7B</div><div class="quick-meta">Alibaba · ~4.7 GB · chatml</div></div>
+          <span style="color:var(--accent)">↓</span>
+        </button>
+        <button class="quick-btn" onclick="quickDl('https://huggingface.co/bartowski/Llama-3.1-8B-Instruct-GGUF/resolve/main/Llama-3.1-8B-Instruct-Q4_K_M.gguf','Llama-3.1-8B-Q4_K_M.gguf')">
+          <div><div class="quick-name">Llama 3.1 8B</div><div class="quick-meta">Meta · ~4.9 GB · llama3</div></div>
+          <span style="color:var(--accent)">↓</span>
+        </button>
+        <button class="quick-btn" onclick="quickDl('https://huggingface.co/bartowski/Mistral-7B-Instruct-v0.3-GGUF/resolve/main/Mistral-7B-Instruct-v0.3-Q4_K_M.gguf','Mistral-7B-v0.3-Q4_K_M.gguf')">
+          <div><div class="quick-name">Mistral 7B v0.3</div><div class="quick-meta">Mistral · ~4.4 GB · mistral</div></div>
+          <span style="color:var(--accent)">↓</span>
+        </button>
+        <button class="quick-btn" onclick="quickDl('https://huggingface.co/bartowski/gemma-2-9b-it-GGUF/resolve/main/gemma-2-9b-it-Q4_K_M.gguf','gemma-2-9b-Q4_K_M.gguf')">
+          <div><div class="quick-name">Gemma 2 9B</div><div class="quick-meta">Google · ~5.5 GB · chatml</div></div>
+          <span style="color:var(--accent)">↓</span>
+        </button>
+
+        <!-- ── Large / 12 GB VRAM or more. Use on own risk── -->
+        <button class="quick-btn" onclick="quickDl('https://huggingface.co/bartowski/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct-Q4_K_M.gguf','Qwen2.5-14B-Q4_K_M.gguf')">
+          <div><div class="quick-name">Qwen 2.5 14B</div><div class="quick-meta">Alibaba · ~8.9 GB · chatml · 12 GB+</div></div>
+          <span style="color:var(--accent)">↓</span>
+        </button>
+        <button class="quick-btn" onclick="quickDl('https://huggingface.co/bartowski/phi-4-GGUF/resolve/main/phi-4-Q4_K_L.gguf?download=true','Phi-4-Q4_K_M.gguf')">
+          <div><div class="quick-name">Phi-4 14B</div><div class="quick-meta">Microsoft · ~8.9 GB · chatml · 12 GB+</div></div>
+          <span style="color:var(--accent)">↓</span>
+        </button>
+
+        <div class="dl-items" id="dl-list"></div>
+      </div>
+
+      <!-- Custom URL -->
+      <div class="section">
+        <div class="section-title">Custom URL</div>
+        <div class="url-row">
+          <input type="text" id="pull-url" placeholder="https://…model.gguf" />
+          <button class="btn" onclick="startDownload()">↓</button>
+        </div>
+      </div>
+
+      <!-- Settings for the model. Presets make it way easier, but I prefer to give users full control as well -->
+      <div class="section">
+        <div class="section-title">Settings</div>
+        <div class="setting">
+          <label>Temperature <span id="temp-val">0.7</span></label>
+          <input type="range" id="temperature" min="0" max="2" step="0.05" value="0.7"
+            oninput="document.getElementById('temp-val').textContent=parseFloat(this.value).toFixed(2);clearPreset()">
+        </div>
+        <div class="setting">
+          <label>Top-P <span id="top-p-val">0.9</span></label>
+          <input type="range" id="top-p" min="0" max="1" step="0.05" value="0.9"
+            oninput="document.getElementById('top-p-val').textContent=parseFloat(this.value).toFixed(2);clearPreset()">
+        </div>
+        <div class="setting">
+          <label>Max tokens <span id="maxtok-val">512</span></label>
+          <input type="range" id="max-tokens" min="64" max="4096" step="64" value="512"
+            oninput="document.getElementById('maxtok-val').textContent=this.value;clearPreset()">
+        </div>
+        <div class="setting">
+          <label>Context length</label>
+          <select id="ctx-len" class="footer-select" style="width:100%;height:auto;padding:6px 8px;font-size:12px">
+            <option value="2048">2048 (low memory)</option>
+            <option value="4096" selected>4096 (default)</option>
+            <option value="8192">8192 (good)</option>
+            <option value="16384">16384 (high RAM)</option>
+            <option value="32768">32768 (experimental)</option>
+          </select>
+        </div>
+        <div class="setting">
+          <label>System prompt (appplies for every prompt)</label>
+          <textarea id="sys-prompt" rows="2" placeholder="You are a helpful assistant."></textarea>
+        </div>
+      </div>
+
+    </div>
+
+    <div style="padding:10px 12px;border-top:1px solid var(--border)">
+      <button class="btn ghost" style="width:100%" onclick="newSession()">+ New Chat</button>
+    </div>
+  </aside>
+
+  <div class="chat">
+    <div class="messages" id="messages">
+      <div class="welcome" id="welcome">
+        <h2>GGUF Chat</h2>
+        <p>load a model → select a preset and start chatting!</p>
+      </div>
+    </div>
+    <div class="input-area">
+      <textarea id="chat-input"
+        placeholder="Message… (Enter to send, Shift+Enter for newline)"
+        onkeydown="handleKey(event)"
+        oninput="autoResize(this); updateTokenCounter()"></textarea>
+      <button class="btn" id="send-btn" onclick="sendMessage()" disabled>Send</button>
+      <button id="stop-btn" onclick="stopGeneration()">Stop</button>
+    </div>
+    <div class="input-footer">
+      <span class="footer-label">template:</span>
+      <select id="template-select" class="footer-select" onchange="onTemplateChange()">
+        <option value="chatml">ChatML</option>
+        <option value="llama2">Llama 2</option>
+        <option value="llama3">Llama 3</option>
+        <option value="mistral">Mistral</option>
+        <option value="alpaca">Alpaca</option>
+      </select>
+      <span class="token-counter" id="token-counter">0 tokens</span>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// States of the frontend functions
+let currentModel   = null;
+let pendingLoad    = null;
+let loadStatus     = 'idle';  // idle | loading | ready | error
+let loadError      = null;
+let isGenerating   = false;
+let abortCtrl      = null;
+let dlTimer        = null;
+let modelTimer     = null;
+let activePreset   = 'balanced';
+
+let sessions       = [];
+let currentSession = null;   // full session object
+
+// The initialisation proces
+(async () => {
+  await loadHW();
+  await loadPresets();
+  await refreshModels();
+  await loadSessions();
+  setInterval(refreshModels, 8000);
+  setInterval(updateTokenCounter, 2000);
+})();
+
+// Helpers to make suer everything works perfectly without having to write a giant block of code each time. I wont do that! Just no! Fuck that
+const get  = url => fetch(url).then(r => r.json());
+const post = (url, body) => fetch(url, {
+  method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+}).then(r => r.json());
+const del_ = (url, body) => fetch(url, {
+  method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body||{})
+}).then(r => r.json());
+const put  = (url, body) => fetch(url, {
+  method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+}).then(r => r.json());
+const esc  = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fmt  = b => b>1e6?(b/1e6).toFixed(1)+' MB':b>1e3?(b/1e3).toFixed(0)+' KB':b+' B';
+const fmtT = s => s>3600?Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m':s>60?Math.floor(s/60)+'m '+(s%60)+'s':s+'s';
+const fmtDate = ts => {
+  const d = new Date(ts * 1000);
+  return d.toLocaleDateString(undefined, {month:'short', day:'numeric'});
+};
+
+// Load hardware information
+async function loadHW() {
+  try {
+    const hw = await get('/api/hardware');
+    const el = document.getElementById('hw-badge');
+    if (hw.cuda)      { el.textContent = 'cuda · '+(hw.gpu_name||'GPU'); el.className='gpu'; }
+    else if (hw.rocm) { el.textContent = 'rocm · '+(hw.gpu_name||'AMD'); el.className='gpu'; }
+    else              { el.textContent = 'cpu'; }
+  } catch(e) {}
+}
+
+// The logic behind the status header so the user has an actual indication of what happens
+function updateStatusHeader() {
+  const dot  = document.getElementById('status-dot');
+  const text = document.getElementById('status-text');
+  dot.className = 'status-dot ' + loadStatus;
+  if (loadStatus === 'ready' && currentModel) {
+    text.textContent = currentModel.replace(/\.gguf$/i, '');
+  } else if (loadStatus === 'loading') {
+    text.textContent = 'loading…';
+  } else if (loadStatus === 'error') {
+    text.textContent = 'load error';
+  } else {
+    text.textContent = 'no model';
+  }
+}
+
+// The preset fetching, I realise a lot goes through frontend and im tired of it!
+let presetsData = {};
+async function loadPresets() {
+  try {
+    presetsData = await get('/api/presets');
+    renderPresets();
+    applyPreset('balanced');
+  } catch(e) {}
+}
+
+function renderPresets() {
+  const grid = document.getElementById('preset-grid');
+  grid.innerHTML = Object.entries(presetsData).map(([key, p]) => `
+    <button class="preset-btn ${key===activePreset?'active':''}" 
+            id="preset-${key}" onclick="applyPreset('${key}')">
+      <span class="preset-btn-name">${p.label}</span>
+      <span class="preset-btn-desc">${p.description}</span>
+    </button>
+  `).join('');
+}
+
+function applyPreset(key) {
+  const p = presetsData[key];
+  if (!p) return;
+  activePreset = key;
+  document.getElementById('temperature').value = p.temperature;
+  document.getElementById('temp-val').textContent = p.temperature.toFixed(2);
+  document.getElementById('top-p').value = p.top_p;
+  document.getElementById('top-p-val').textContent = p.top_p.toFixed(2);
+  document.getElementById('max-tokens').value = p.max_tokens;
+  document.getElementById('maxtok-val').textContent = p.max_tokens;
+  // Update active state
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('preset-'+key);
+  if (btn) btn.classList.add('active');
+}
+
+function clearPreset() {
+  activePreset = null;
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+}
+
+// Models
+async function refreshModels() {
+  try {
+    const d = await get('/api/models');
+    currentModel = d.loaded;
+    const el = document.getElementById('model-list');
+    if (!d.models.length) {
+      el.innerHTML = '<div class="empty">no .gguf files</div>';
+    } else {
+      el.innerHTML = d.models.map(m => {
+        const active  = m.name === d.loaded;
+        const loading = m.name === pendingLoad && loadStatus === 'loading';
+        const errored = m.name === pendingLoad && loadStatus === 'error';
+        const size = m.size_mb >= 1024 ? (m.size_mb/1024).toFixed(1)+' GB' : m.size_mb+' MB';
+        const acts = active
+          ? `<button class="mini-btn unload" onclick="event.stopPropagation();unloadModel()">unload</button>`
+          : `<button class="mini-btn load" onclick="event.stopPropagation();loadModel('${esc(m.name)}','${m.suggested_template}')">load</button>`;
+        return `<div class="model-item ${active?'active':loading?'loading':errored?'errored':''}" 
+                     onclick="clickModel('${esc(m.name)}','${m.suggested_template}')">
+          <div class="model-dot"></div>
+          <div class="model-label">
+            <div class="model-name" title="${esc(m.name)}">${esc(m.name)}</div>
+            <div class="model-size">${size} · ${m.suggested_template}</div>
+          </div>
+          <div class="model-acts">
+            ${acts}
+            <button class="mini-btn del" onclick="event.stopPropagation();deleteModel('${esc(m.name)}')">✕</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+    // Show/hide load error since we dont give a fuck
+    const errEl = document.getElementById('load-error-display');
+    errEl.innerHTML = loadError ? `<div class="error-badge">⚠ ${esc(loadError)}</div>` : '';
+    document.getElementById('send-btn').disabled = !d.loaded;
+    updateStatusHeader();
+  } catch(e) {}
+}
+
+function clickModel(name, suggestedTemplate) {
+  if (name !== currentModel) loadModel(name, suggestedTemplate);
+}
+
+async function loadModel(name, suggestedTemplate) {
+  pendingLoad = name;
+  loadStatus = 'loading';
+  loadError = null;
+  updateStatusHeader();
+  if (suggestedTemplate) {
+    document.getElementById('template-select').value = suggestedTemplate;
+  }
+  await post('/api/models/load', {
+    filename: name,
+    max_seq_len: parseInt(document.getElementById('ctx-len').value)
+  });
+  if (modelTimer) clearInterval(modelTimer);
+  modelTimer = setInterval(async () => {
+    const s = await get('/api/models/status');
+    loadStatus = s.status;
+    loadError  = s.error;
+    if (s.status === 'ready') {
+      clearInterval(modelTimer);
+      pendingLoad = null;
+      await refreshModels();
+      toast('Loaded ' + name, 'ok');
+    } else if (s.status === 'error') {
+      clearInterval(modelTimer);
+      await refreshModels();
+      toast('Load failed: ' + s.error, 'err');
+    }
+    updateStatusHeader();
+  }, 800);
+}
+
+async function unloadModel() {
+  await post('/api/models/unload', {});
+  currentModel = pendingLoad = null;
+  loadStatus = 'idle'; loadError = null;
+  await refreshModels();
+}
+
+async function deleteModel(name) {
+  if (!confirm('Delete ' + name + '?')) return;
+  const r = await post('/api/models/delete', {filename: name});
+  if (r.error) { toast(r.error, 'err'); return; }
+  await refreshModels();
+  toast('Deleted');
+}
+
+// The sessions, its so awful
+async function loadSessions() {
+  try {
+    sessions = await get('/api/sessions');
+    renderSessions();
+    // Auto-open the most recent session or create one 
+    // If I wish that this causes so many bugs
+    if (sessions.length) {
+      await openSession(sessions[0].id);
+    } else {
+      await newSession();
+    }
+  } catch(e) {}
+}
+
+function renderSessions() {
+  const el = document.getElementById('session-list');
+  if (!sessions.length) {
+    el.innerHTML = '<div class="empty">no sessions</div>';
+    return;
+  }
+  el.innerHTML = sessions.map(s => `
+    <div class="session-item ${currentSession && s.id === currentSession.id ? 'active' : ''}"
+         onclick="openSession('${s.id}')">
+      <div class="session-label">
+        <div class="session-name" title="${esc(s.name)}">${esc(s.name)}</div>
+        <div class="session-meta">${fmtDate(s.updated_at)} · ${s.messages.length} msg</div>
+      </div>
+      <div class="session-acts">
+        <button class="mini-btn rename" onclick="event.stopPropagation();renameSession('${s.id}')">✎</button>
+        <button class="mini-btn del" onclick="event.stopPropagation();deleteSession_('${s.id}')">✕</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function newSession() {
+  const s = await post('/api/sessions', {});
+  sessions.unshift(s);
+  await openSession(s.id);
+  renderSessions();
+}
+
+async function openSession(id) {
+  try {
+    const s = await get('/api/sessions/' + id);
+    currentSession = s;
+    renderChat();
+    renderSessions();
+  } catch(e) {}
+}
+
+async function renameSession(id) {
+  const name = prompt('Rename session:', sessions.find(s=>s.id===id)?.name || '');
+  if (!name) return;
+  const r = await post('/api/sessions/' + id + '/rename', {name});
+  const idx = sessions.findIndex(s => s.id === id);
+  if (idx >= 0) sessions[idx] = r;
+  if (currentSession?.id === id) currentSession = r;
+  renderSessions();
+}
+
+async function deleteSession_(id) {
+  if (!confirm('Delete this session?')) return;
+  await del_('/api/sessions/' + id);
+  sessions = sessions.filter(s => s.id !== id);
+  if (currentSession?.id === id) {
+    currentSession = null;
+    if (sessions.length) await openSession(sessions[0].id);
+    else await newSession();
+  }
+  renderSessions();
+}
+
+async function saveCurrentSession() {
+  if (!currentSession) return;
+  const updated = await put('/api/sessions/' + currentSession.id, {
+    messages: currentSession.messages
+  });
+  currentSession = updated;
+  const idx = sessions.findIndex(s => s.id === currentSession.id);
+  if (idx >= 0) sessions[idx] = updated;
+  renderSessions();
+}
+
+// Render the actual chat so that the user can use it
+function renderChat() {
+  const msgsEl = document.getElementById('messages');
+  if (!currentSession || !currentSession.messages.length) {
+    msgsEl.innerHTML = `<div class="welcome" id="welcome"><h2>GGUF Chat</h2><p>load a model → select a preset → start chatting</p></div>`;
+    return;
+  }
+  msgsEl.innerHTML = '';
+  for (const m of currentSession.messages) {
+    addMsgEl(m.role, m.content);
+  }
+  scrollDown();
+}
+
+function addMsgEl(role, text) {
+  const msgs = document.getElementById('messages');
+  const d = document.createElement('div');
+  d.className = 'msg ' + role;
+  d.innerHTML = `<div class="msg-role">${role}</div><div class="msg-text"></div>`;
+  const c = d.querySelector('.msg-text');
+  c.textContent = text;
+  msgs.appendChild(d);
+  return c;
+}
+
+function scrollDown() {
+  const m = document.getElementById('messages');
+  m.scrollTop = m.scrollHeight;
+}
+
+// Just display the counted tokens from the backend api from the python file
+let tokenCountTimeout = null;
+async function updateTokenCounter() {
+  if (!currentSession) return;
+  const msgs = currentSession.messages;
+  const input = document.getElementById('chat-input').value;
+  const allMsgs = [...msgs];
+  if (input) allMsgs.push({role:'user', content:input});
+  const ctxLen = parseInt(document.getElementById('ctx-len').value);
+  try {
+    const r = await post('/api/tokens/count', {messages: allMsgs});
+    const count = r.precise ?? r.rough;
+    const ratio = count / ctxLen;
+    const el = document.getElementById('token-counter');
+    el.textContent = `~${count} / ${ctxLen} tokens`;
+    el.className = 'token-counter' + (ratio > .9 ? ' danger' : ratio > .75 ? ' warn' : '');
+  } catch(e) {}
+}
+
+// Template
+function onTemplateChange() {
+  // If I remove it kils me
+}
+
+// Download helper
+function quickDl(url, filename) { doDownload(url, filename); }
+async function startDownload() {
+  const url = document.getElementById('pull-url').value.trim();
+  if (!url) return;
+  document.getElementById('pull-url').value = '';
+  doDownload(url);
+}
+async function doDownload(url, filename) {
+  const r = await post('/api/download', {url, filename: filename || ''});
+  if (r.error) { toast(r.error, 'err'); return; }
+  startDlPoll();
+}
+function startDlPoll() {
+  if (dlTimer) return;
+  dlTimer = setInterval(async () => {
+    const prog = await get('/api/download/progress');
+    const el = document.getElementById('dl-list');
+    const entries = Object.entries(prog);
+    el.innerHTML = entries.map(([name, d]) => {
+      if (d.done)  return `<div class="dl-item dl-ok">✓ ${esc(name)}</div>`;
+      if (d.error) return `<div class="dl-item dl-err">✗ ${esc(d.error)}</div>`;
+      const pct = d.total ? Math.round(d.downloaded/d.total*100) : 0;
+      return `<div class="dl-item">
+        <div class="dl-row"><span>${esc(name)}</span><span>${pct}% · ${fmt(d.speed)}/s${d.eta?' · '+fmtT(d.eta):''}</span></div>
+        <div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div>
+      </div>`;
+    }).join('');
+    if (entries.every(([,d]) => d.done || d.error)) {
+      clearInterval(dlTimer); dlTimer = null;
+      await refreshModels();
+    }
+  }, 700);
+}
+
+// The actual receiving of the SSE stream for chatting
+async function sendMessage() {
+  const input = document.getElementById('chat-input');
+  const text  = input.value.trim();
+  if (!text || isGenerating || !currentModel) return;
+  if (!currentSession) await newSession();
+
+  const sys = document.getElementById('sys-prompt').value.trim();
+  const full = [];
+  if (sys) full.push({role:'system', content:sys});
+  full.push(...currentSession.messages, {role:'user', content:text});
+
+  // Save user message
+  currentSession.messages.push({role:'user', content:text});
+  input.value = ''; autoResize(input);
+
+  const welcome = document.getElementById('welcome');
+  if (welcome) welcome.remove();
+
+  addMsgEl('user', text);
+  const aiEl = addMsgEl('assistant', '');
+  aiEl.classList.add('cursor');
+  scrollDown();
+
+  isGenerating = true;
+  document.getElementById('send-btn').style.display = 'none';
+  document.getElementById('stop-btn').classList.add('show');
+  document.getElementById('chat-input').disabled = true;
+  abortCtrl = new AbortController();
+
+  let aiText = '';
+  try {
+    const resp = await fetch('/api/chat/stream', {
+      method: 'POST',
+      signal: abortCtrl.signal,
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        messages: full,
+        temperature: parseFloat(document.getElementById('temperature').value),
+        top_p:       parseFloat(document.getElementById('top-p').value),
+        max_tokens:  parseInt(document.getElementById('max-tokens').value),
+        template:    document.getElementById('template-select').value,
+        max_ctx:     parseInt(document.getElementById('ctx-len').value),
+        session_id:  currentSession.id,
+      })
+    });
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, {stream:true});
+      const lines = buf.split('\n'); buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const pay = line.slice(6).trim();
+        if (pay === '[DONE]') break;
+        try {
+          const obj = JSON.parse(pay);
+          if (obj.token) {
+            aiText += obj.token;
+            aiEl.textContent = aiText;
+            scrollDown();
+          }
+          if (obj.info === 'context_trimmed') {
+            const notice = document.createElement('div');
+            notice.className = 'trimmed-notice';
+            notice.textContent = '⚠ context trimmed to fit window';
+            document.getElementById('messages').appendChild(notice);
+          }
+          if (obj.error) {
+            aiEl.textContent = '[error: ' + obj.error + ']';
+          }
+        } catch(e) {}
+      }
+    }
+  } catch(e) {
+    if (e.name !== 'AbortError') aiEl.textContent = '[error: ' + e.message + ']';
+  }
+
+  aiEl.classList.remove('cursor');
+
+  // Save assistant reply to session to use it later in chats so it kinda has memory
+  // It doesnt know it has though
+
+  currentSession.messages.push({role:'assistant', content:aiText});
+  await saveCurrentSession();
+
+  isGenerating = false;
+  document.getElementById('send-btn').style.display = '';
+  document.getElementById('stop-btn').classList.remove('show');
+  document.getElementById('chat-input').disabled = false;
+  document.getElementById('chat-input').focus();
+  await updateTokenCounter();
+}
+
+function stopGeneration() { if (abortCtrl) abortCtrl.abort(); }
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+}
+
+// Toast message for indication of anything that requires user attention not too obvious
+let toastT;
+function toast(msg, type='') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show ' + type;
+  clearTimeout(toastT);
+  toastT = setTimeout(() => el.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+models/
+server.zip
+sessions.json
+endai-small/
+endai-small-final/
+EndAISmall/llama.cpp/
+EndAI/llama.cpp/
+EndAI/model-q4_k_m.gguf
+EndAI/model.f16.gguf
+__pycache__
+EndAI/lora_out/adapter_model.safetensors
+EndAI/merged_model/model.safetensors
+EndAI/lora_out
+EndAI/merged_model
+EndAI/data.jsonl
